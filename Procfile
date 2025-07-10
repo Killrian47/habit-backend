@@ -1,1 +1,0 @@
-web: java -Dserver.port=$PORT -jar target/habit_backend-0.0.1-SNAPSHOT.jar
