@@ -2,11 +2,16 @@ package com.habitapp.habit_backend.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import com.habitapp.habit_backend.dto.LevelProgressDTO;
 import com.habitapp.habit_backend.model.User;
 import com.habitapp.habit_backend.repository.UserRepository;
+import com.habitapp.habit_backend.service.LevelingService;
+import com.habitapp.habit_backend.service.UserService;
 
 import java.util.Optional;
 
@@ -16,6 +21,12 @@ public class UserController {
 
   @Autowired
   private UserRepository userRepository;
+
+  @Autowired
+  private LevelingService levelingService;
+
+  @Autowired
+  private UserService userService;
 
   @GetMapping("/me")
   public ResponseEntity<?> getCurrentUser() {
@@ -38,56 +49,21 @@ public class UserController {
         user.getLevel()));
   }
 
-  @PutMapping("/update")
-  public ResponseEntity<?> updateUser(@RequestBody UserUpdateRequest request) {
-    String mail = SecurityContextHolder.getContext().getAuthentication().getName();
-
-    Optional<User> userOptional = userRepository.findByMail(mail);
-
-    if (userOptional.isEmpty()) {
-      return ResponseEntity.notFound().build();
-    }
-
-    User existingUser = userOptional.get();
-
-    // Validation des données
-    if (request.username() == null || request.username().trim().isEmpty()) {
-      return ResponseEntity.badRequest().body("Username ne peut pas être vide");
-    }
-
-    if (request.username().length() < 3 || request.username().length() > 50) {
-      return ResponseEntity.badRequest().body("Username doit contenir entre 3 et 50 caractères");
-    }
-
-    // Vérifier si le username existe déjà (si différent de l'actuel)
-    if (!request.username().equals(existingUser.getUsername())) {
-      Optional<User> existingUsername = userRepository.findByUsername(request.username());
-      if (existingUsername.isPresent()) {
-        return ResponseEntity.badRequest().body("Ce nom d'utilisateur est déjà utilisé");
-      }
-    }
-
-    try {
-      // Mettre à jour seulement le username (pas l'email pour des raisons de
-      // sécurité)
-      existingUser.setUsername(request.username().trim());
-
-      User savedUser = userRepository.save(existingUser);
-
-      return ResponseEntity.ok(new UserInfoResponse(
-          savedUser.getId(),
-          savedUser.getUsername(),
-          savedUser.getMail(),
-          savedUser.getXp(),
-          savedUser.getLevel()));
-
-    } catch (Exception e) {
-      return ResponseEntity.internalServerError().body("Erreur lors de la mise à jour");
-    }
+  // Endpoint pour récupérer le niveau et la progression de l'utilisateur
+  @GetMapping("/level")
+  public ResponseEntity<LevelProgressDTO> getUserLevel(@AuthenticationPrincipal UserDetails userDetails) {
+    User user = userService.getByEmail(userDetails.getUsername());
+    LevelProgressDTO progress = levelingService.getUserLevelProgress(user);
+    return ResponseEntity.ok(progress);
   }
 
-  // Record pour les données de mise à jour (sans email)
-  public record UserUpdateRequest(String username) {
+  // Mettre à jour le niveau de l'utilisateur
+  @GetMapping("/level/apply-xp")
+  public ResponseEntity<?> applyLeveling(@AuthenticationPrincipal UserDetails userDetails) {
+    User user = userService.getByEmail(userDetails.getUsername());
+    levelingService.applyLeveling(user);
+    LevelProgressDTO progress = levelingService.getUserLevelProgress(user);
+    return ResponseEntity.ok(progress);
   }
 
   public record UserInfoResponse(
