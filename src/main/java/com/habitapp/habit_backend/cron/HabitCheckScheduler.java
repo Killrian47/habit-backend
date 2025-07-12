@@ -25,7 +25,7 @@ public class HabitCheckScheduler {
     this.exerciseCheckRepository = exerciseCheckRepository;
   }
 
-  @Scheduled(cron = "0 0 0 * * *") // Tous les jours à minuit
+  @Scheduled(cron = "0 0 * * * *") // Tous les jours à minuit
   @Transactional
   public void generateDailyHabitChecks() {
     List<Habit> allHabits = habitRepository.findAll();
